@@ -17,12 +17,6 @@ FILES_TO_LINK = [
     (REPO_ROOT / "micro_speech_test.cc",
      TFLM / "micro_speech_test.cc"),
 
-    (REPO_ROOT / "evaluate.py",
-     TFLM / "evaluate.py"),
-
-    (REPO_ROOT / "evaluate_test.py",
-     TFLM / "evaluate_test.py"),
-
     (REPO_ROOT / "models/micro_speech_quantized.tflite",
      TFLM / "models/micro_speech_quantized.tflite"),
 
