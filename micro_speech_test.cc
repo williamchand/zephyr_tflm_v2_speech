@@ -36,8 +36,8 @@ constexpr int kAudioSampleStrideCount =
 // suppression window for streaming detection
 constexpr int kSuppressionFrames = 25;
 
-using MicroSpeechOpResolver = tflite::MicroMutableOpResolver<4>;
-using AudioPreprocessorOpResolver = tflite::MicroMutableOpResolver<18>;
+using MicroSpeechOpResolver     = tflite::MicroMutableOpResolver<4>;
+using AudioPreprocessorOpResolver = tflite::MicroMutableOpResolver<19>;  // ← 18→19 for Quantize
 
 TfLiteStatus RegisterOps(MicroSpeechOpResolver& op_resolver) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddReshape());
@@ -66,7 +66,7 @@ TfLiteStatus RegisterOps(AudioPreprocessorOpResolver& op_resolver) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankSpectralSubtraction());
   TF_LITE_ENSURE_STATUS(op_resolver.AddPCAN());
   TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankLog());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddQuantize());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddQuantize());              // ← added for float32→int8
   return kTfLiteOk;
 }
 
@@ -90,16 +90,15 @@ TfLiteStatus LoadMicroSpeechModelAndPerformInference(
 
   TfLiteTensor* output = interpreter.output(0);
 
-  float scale = output->params.scale;
-  int zero_point = output->params.zero_point;
+  float scale      = output->params.scale;
+  int   zero_point = output->params.zero_point;
 
   float best_score = -1e9f;
-  int best_index = 0;
+  int   best_index = 0;
 
   for (int i = 0; i < kCategoryCount; ++i) {
     float score =
         (tflite::GetTensorData<int8_t>(output)[i] - zero_point) * scale;
-
     if (score > best_score) {
       best_score = score;
       best_index = i;
@@ -114,14 +113,17 @@ TfLiteStatus LoadMicroSpeechModelAndPerformInference(
   return kTfLiteOk;
 }
 
-TfLiteStatus GenerateSingleFeature(const int16_t* audio_data,
+// ← changed int16_t* → float* 
+TfLiteStatus GenerateSingleFeature(const float* audio_data,        // ← float32 input
                                    const int audio_data_size,
                                    int8_t* feature_output,
                                    tflite::MicroInterpreter* interpreter) {
 
   TfLiteTensor* input = interpreter->input(0);
+
+  // ← feed float32 directly
   std::copy_n(audio_data, audio_data_size,
-              tflite::GetTensorData<int16_t>(input));
+              tflite::GetTensorData<float>(input));               // ← float not int16_t
 
   TF_LITE_ENSURE_STATUS(interpreter->Invoke());
 
@@ -131,7 +133,8 @@ TfLiteStatus GenerateSingleFeature(const int16_t* audio_data,
   return kTfLiteOk;
 }
 
-TfLiteStatus GenerateFeatures(const int16_t* audio_data,
+// ← changed int16_t* → float*
+TfLiteStatus GenerateFeatures(const float* audio_data,             // ← float32 input
                               const size_t audio_data_size,
                               Features* features_output) {
 
@@ -145,7 +148,7 @@ TfLiteStatus GenerateFeatures(const int16_t* audio_data,
   TF_LITE_ENSURE_STATUS(interpreter.AllocateTensors());
 
   size_t remaining_samples = audio_data_size;
-  size_t feature_index = 0;
+  size_t feature_index     = 0;
 
   while (remaining_samples >= kAudioSampleDurationCount &&
          feature_index < kFeatureCount) {
@@ -157,15 +160,16 @@ TfLiteStatus GenerateFeatures(const int16_t* audio_data,
                               &interpreter));
 
     feature_index++;
-    audio_data += kAudioSampleStrideCount;
+    audio_data        += kAudioSampleStrideCount;
     remaining_samples -= kAudioSampleStrideCount;
   }
 
   return kTfLiteOk;
 }
 
+// ← changed int16_t* → float*
 TfLiteStatus TestAudioSample(const char* label,
-                             const int16_t* audio_data,
+                             const float* audio_data,              // ← float32 input
                              const size_t audio_data_size) {
 
   TF_LITE_ENSURE_STATUS(
@@ -177,14 +181,13 @@ TfLiteStatus TestAudioSample(const char* label,
   return kTfLiteOk;
 }
 
-// ring buffer shift
+// ring buffer shift — unchanged
 void ShiftRingBuffer(Features& buffer, const int8_t* new_feature) {
   for (int r = 0; r < kFeatureCount - 1; ++r) {
     std::copy(&buffer[r + 1][0],
               &buffer[r + 1][0] + kFeatureSize,
               &buffer[r][0]);
   }
-
   std::copy(new_feature,
             new_feature + kFeatureSize,
             &buffer[kFeatureCount - 1][0]);
@@ -208,17 +211,15 @@ int PredictCategory(const Features& features) {
 
   TfLiteTensor* output = interpreter.output(0);
 
-  float scale = output->params.scale;
-  int zero_point = output->params.zero_point;
+  float scale      = output->params.scale;
+  int   zero_point = output->params.zero_point;
 
-  int best_index = 0;
+  int   best_index = 0;
   float best_score = -1e9f;
 
   for (int i = 0; i < kCategoryCount; ++i) {
-
     float score =
         (tflite::GetTensorData<int8_t>(output)[i] - zero_point) * scale;
-
     if (score > best_score) {
       best_score = score;
       best_index = i;
@@ -231,49 +232,66 @@ int PredictCategory(const Features& features) {
 }  // namespace
 
 
+// ── test data is int16 — convert to float32 before passing ──
+// helper to convert test data
+static void ConvertInt16ToFloat(const int16_t* src, float* dst, size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    dst[i] = static_cast<float>(src[i]);                         // ← direct cast, no scaling
+  }
+}
+
 TEST(MicroSpeechTest, NoTest) {
-  ASSERT_EQ(TestAudioSample("no",
-                            g_no_1000ms_audio_data,
-                            g_no_1000ms_audio_data_size),
+  float float_audio[g_no_1000ms_audio_data_size];
+  ConvertInt16ToFloat(g_no_1000ms_audio_data,
+                      float_audio,
+                      g_no_1000ms_audio_data_size);
+  ASSERT_EQ(TestAudioSample("no", float_audio, g_no_1000ms_audio_data_size),
             kTfLiteOk);
 }
 
 TEST(MicroSpeechTest, YesTest) {
-  ASSERT_EQ(TestAudioSample("yes",
-                            g_yes_1000ms_audio_data,
-                            g_yes_1000ms_audio_data_size),
+  float float_audio[g_yes_1000ms_audio_data_size];
+  ConvertInt16ToFloat(g_yes_1000ms_audio_data,
+                      float_audio,
+                      g_yes_1000ms_audio_data_size);
+  ASSERT_EQ(TestAudioSample("yes", float_audio, g_yes_1000ms_audio_data_size),
             kTfLiteOk);
 }
 
 TEST(MicroSpeechTest, SilenceTest) {
-  ASSERT_EQ(TestAudioSample("silence",
-                            g_silence_1000ms_audio_data,
-                            g_silence_1000ms_audio_data_size),
+  float float_audio[g_silence_1000ms_audio_data_size];
+  ConvertInt16ToFloat(g_silence_1000ms_audio_data,
+                      float_audio,
+                      g_silence_1000ms_audio_data_size);
+  ASSERT_EQ(TestAudioSample("silence", float_audio, g_silence_1000ms_audio_data_size),
             kTfLiteOk);
 }
 
 TEST(MicroSpeechTest, NoiseTest) {
-  ASSERT_EQ(TestAudioSample("silence",
-                            g_noise_1000ms_audio_data,
-                            g_noise_1000ms_audio_data_size),
+  float float_audio[g_noise_1000ms_audio_data_size];
+  ConvertInt16ToFloat(g_noise_1000ms_audio_data,
+                      float_audio,
+                      g_noise_1000ms_audio_data_size);
+  ASSERT_EQ(TestAudioSample("silence", float_audio, g_noise_1000ms_audio_data_size),
             kTfLiteOk);
 }
 
 // streaming test with suppression
 TEST(MicroSpeechTest, RingBufferSuppression) {
 
-  Features yes_features;
+  float float_audio[g_yes_1000ms_audio_data_size];
+  ConvertInt16ToFloat(g_yes_1000ms_audio_data,
+                      float_audio,
+                      g_yes_1000ms_audio_data_size);
 
+  Features yes_features;
   ASSERT_EQ(
-      GenerateFeatures(g_yes_1000ms_audio_data,
-                       g_yes_1000ms_audio_data_size,
-                       &yes_features),
+      GenerateFeatures(float_audio, g_yes_1000ms_audio_data_size, &yes_features),
       kTfLiteOk);
 
-  Features ring = {};
-
-  bool saw_keyword = false;
-  int suppression_counter = 0;
+  Features ring           = {};
+  bool     saw_keyword    = false;
+  int      suppression_counter = 0;
 
   for (int frame = 0; frame < kFeatureCount; ++frame) {
 
@@ -287,8 +305,8 @@ TEST(MicroSpeechTest, RingBufferSuppression) {
     int predicted = PredictCategory(ring);
 
     if (predicted >= 2) {
-      saw_keyword = true;
-      suppression_counter = kSuppressionFrames;
+      saw_keyword          = true;
+      suppression_counter  = kSuppressionFrames;
     }
   }
 
