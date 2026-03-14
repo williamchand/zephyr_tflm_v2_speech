@@ -19,7 +19,6 @@ Licensed under the Apache License, Version 2.0 */
 #include "tensorflow/lite/micro/micro_log.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/testing/micro_test_v2.h"
-#include "tensorflow/lite/micro/all_ops_resolver.h"  // add this include
 
 namespace {
 
