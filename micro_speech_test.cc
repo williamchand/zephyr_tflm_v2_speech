@@ -66,7 +66,6 @@ TfLiteStatus RegisterOps(AudioPreprocessorOpResolver& op_resolver) {
   TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankSpectralSubtraction());
   TF_LITE_ENSURE_STATUS(op_resolver.AddPCAN());
   TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankLog());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddQuantize());
   return kTfLiteOk;
 }
 
