@@ -249,14 +249,14 @@ TEST(MicroSpeechTest, YesTest) {
 }
 
 TEST(MicroSpeechTest, SilenceTest) {
-  ASSERT_EQ(TestAudioSample("silence",
+  ASSERT_EQ(TestAudioSample("_silence_",
                             g_silence_1000ms_audio_data,
                             g_silence_1000ms_audio_data_size),
             kTfLiteOk);
 }
 
 TEST(MicroSpeechTest, NoiseTest) {
-  ASSERT_EQ(TestAudioSample("silence",
+  ASSERT_EQ(TestAudioSample("_noise_",
                             g_noise_1000ms_audio_data,
                             g_noise_1000ms_audio_data_size),
             kTfLiteOk);
