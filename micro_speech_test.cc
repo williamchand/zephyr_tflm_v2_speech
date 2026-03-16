@@ -35,50 +35,41 @@ constexpr int kAudioSampleStrideCount =
 
 // suppression window for streaming detection
 constexpr int kSuppressionFrames = 25;
-constexpr int kMicroSpeechOpCount       = 8;
-constexpr int kAudioPreprocessorOpCount = 25;
+constexpr int kMicroSpeechOpCount       = 6;
+constexpr int kAudioPreprocessorOpCount = 18;
 
 using MicroSpeechOpResolver       = tflite::MicroMutableOpResolver<kMicroSpeechOpCount>;
 using AudioPreprocessorOpResolver = tflite::MicroMutableOpResolver<kAudioPreprocessorOpCount>;
 
 TfLiteStatus RegisterOps(MicroSpeechOpResolver& op_resolver) {
+  TF_LITE_ENSURE_STATUS(op_resolver.AddConv2D());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddFullyConnected());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddReshape());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddPack());
   TF_LITE_ENSURE_STATUS(op_resolver.AddShape());
   TF_LITE_ENSURE_STATUS(op_resolver.AddStridedSlice());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddPack());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddReshape());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddConv2D());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddMaxPool2D());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddFullyConnected());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddMean());
   return kTfLiteOk;
 }
 
 TfLiteStatus RegisterOps(AudioPreprocessorOpResolver& op_resolver) {
-  TF_LITE_ENSURE_STATUS(op_resolver.AddCast());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddMul());
   TF_LITE_ENSURE_STATUS(op_resolver.AddReshape());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddAbs());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddReduceMax());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddCast());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddStridedSlice());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddConcatenation());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddMul());
   TF_LITE_ENSURE_STATUS(op_resolver.AddAdd());
   TF_LITE_ENSURE_STATUS(op_resolver.AddDiv());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddLog());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddFloor());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddRelu());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddPow());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddPad());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddRfft2d());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddImag());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddSquare());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddReal());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddSlice());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddConcatenation());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddFullyConnected());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddSqrt());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddMean());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddSub());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddRound());
-  TF_LITE_ENSURE_STATUS(op_resolver.AddMaximum());
   TF_LITE_ENSURE_STATUS(op_resolver.AddMinimum());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddMaximum());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddWindow());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddFftAutoScale());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddRfft());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddEnergy());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBank());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankSquareRoot());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankSpectralSubtraction());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddPCAN());
+  TF_LITE_ENSURE_STATUS(op_resolver.AddFilterBankLog());
   return kTfLiteOk;
 }
 
